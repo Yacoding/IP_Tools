@@ -8,6 +8,7 @@ Created on 14 Nov 2013
 import socket
 import select
 import struct
+import threading
 from datetime import datetime
 import time.sleep as sleep
 import os
@@ -64,10 +65,12 @@ ICMP_TIMXCEED_REASS = 1
 
 BUFSIZE = 2000
     
-class icmp_gen(object):
+class IcmpGen(object):
     
     def __init__(self):
         self.keepRunning = {}
+        
+        self.socketMutex = threading.Lock()
     
     def openSocket(self, dest):
         s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.getprotobyname('icmp'))
@@ -77,28 +80,38 @@ class icmp_gen(object):
         return s
     
     def closeSocket(self, s):
+        self.socketMutex.acquire()
         s.close()
+        self.socketMutex.release()
         return
     
-    def send(self, s, pkt, dest):
-        return s.send(pkt)
+    def send(self, s, pkt):
+        self.socketMutex.acquire()
+        s.send(pkt)
+        self.socketMutex.release()
+        return 
     
     def recv(self, s):
-        return s.recv(BUFSIZE)
+        self.socketMutex.acquire()
+        s.recv(BUFSIZE)
+        self.socketMutex.release()
+        return
     
     def sendAndRecvResponse(self, pkt, dest, timeout = 60):
 
         s = self.openSocket(dest)
            
+        self.socketMutex.acquire()
         startTime = datetime.now()
         self.send(s, pkt.raw)
         buf = self.recv(s)
         endTime = datetime.now()
+        self.socketMutex.release()
         
         self.closeSocket(s)
         return packet(buf[20:]), (endTime - startTime)
     
-    def ping(self, dst):
+    def simplePing(self, dst):
         
         pkt = packet()
         pkt.createPacket({'type':ICMP_ECHO, 'payload':'abc', 'id':1, 'seq':1})
@@ -106,31 +119,31 @@ class icmp_gen(object):
         
         print "< ICMP test Time taken %d.%06d packet receieved %s >" % ( timetaken.seconds, timetaken.microseconds, recv_packet)
         
-    def sendPing(self, dst, _id, seq_start, seq_end, interPacketInterval):
-        s = self.openSocket(dst)
+    def sendPing(self, dataStr, s, dst, _id, seq_start, seq_end, interPacketInterval = 0.001):
         pkt = packet()
         pkt.createPacket({'type':ICMP_ECHO, 'payload':'abc', 'id':_id, 'seq':seq_start})
         
         for i in range(seq_start, seq_end + 1):
             pkt.createPacket({'seq':i})
-            s.send(pkt.raw)
+            self.send(s, pkt.raw)
+            dataStr.addRecordData(i, 'start time', datetime.now())
             sleep(interPacketInterval)
         
         self.closeSocket(s)
         
         
-    def icmpRecvr(self, threadID, s):
-        self.keepRunning['threadID'] = True
+    def icmpRecvr(self, threadID, s, dataStr):
+        self.keepRunning[threadID] = True
         timeout = 3
         
         rdlist = [s]
-        while self.keepRunning['threadID']:
+        while self.keepRunning[threadID]:
             rd = select.select(rdlist, None, None, timeout)
             if rd:
                 try:
-                    buf = s.recv(BUFSIZE)
+                    buf = self.recv(s)
                     pkt = packet(buf[20:])
-                    rec_time = datetime.now()
+                    dataStr.addRecordData(pkt.seq, 'end time', datetime.now())
                 except ValueError:
                     continue
         
@@ -328,7 +341,8 @@ class packet(object):
         return self.raw
     
     
-import sys    
+import sys
+from Tools.PacketDataCollector import dataStore 
 #import pydevd
 #pydevd.patch_django_autoreload(patch_remote_debugger=True, patch_show_console=True)
 if __name__ == "__main__":
@@ -337,14 +351,29 @@ if __name__ == "__main__":
         print "This must be run as root"
         exit()
         
-
+#    icmp.simplePing(sys.argv[1])
 #    print >> sys.stderr, "No test cases defined yet"
 #    import Tools.ConfFileParser
 
-    _icmp = icmp_gen()
+    ds = dataStore("ICMP test results")
+    icmp = IcmpGen()
+    sckt = icmp.openSocket(sys.argv[1])
+       
+    #start icmp recv task
+    thread1 = threading.Thread( target = icmp.icmpRecvr, args = ('thread1', sckt, ds) )
+    thread1.start()
     
+    # start sending the pings
+    icmp.sendPing(ds, sckt, sys.argv[1], 0, 0, 20)
+    
+    sleep(60)
+    
+    # stop the receiving thread
+    icmp.keepRunning['thread1'] = False
+    #Wait for receiving thread to end
+    thread1.join()
 #    pydevd.settrace()
-    _icmp.ping(sys.argv[1])
+    
 #     if len(sys.argv) < 2:
 #         print >> sys.stderr, "No configuration file specified"
 #         exit()
