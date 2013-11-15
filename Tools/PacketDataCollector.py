@@ -3,6 +3,7 @@ Created on 15 Nov 2013
 
 @author: kelsey
 '''
+from threading import Lock
 
 class dataStore(object):
     '''
@@ -17,32 +18,43 @@ class dataStore(object):
         
         self.records = {}
         
+        self.mutex = Lock()
+        
     def __str__(self):
         return self.__repr__()
     
     def __repr__(self):
+        self.mutex.acquite()
         string = "<dataStore %s>\n" % self.name
         for key in sorted(self.records.iterkeys()):
             string += ("\t<id %d - " % key)
             for val in self.records[key]:
                 string += str(val) + ":" + str(self.records[key][val]) + " "
             string += ">\n"
+        self.mutex.release()
         return string
     
     def addRecordData(self, key, field, value):
+        self.mutex.acquite()
         if not (key in self.records):
             self.records[key] = {}
         self.records[key][field] = value
+        self.mutex.release()
         
     def getRecordData(self, key):
+        self.mutex.acquite()
         if key in self.records:
-            return self.records[key]
+            result = self.records[key]
         else:
-            return None
+            result = None
+        self.mutex.release()
+        return result
         
     def deleteRecord(self, key):
+        self.mutex.acquire()
         if key in self.records:
             del self.records[key]
+        self.mutex.release()
             
             
 if __name__ == "__main__":
