@@ -12,7 +12,8 @@ class dataStore(object):
     
     def __init__(self, name):
         '''
-        Constructor
+        Constructor.
+        Set up the new dicationary and create the mutex.
         '''
         self.name = name
         
@@ -35,6 +36,9 @@ class dataStore(object):
         return string
     
     def addRecordData(self, key, field, value):
+        '''
+        Add/Update a field and value combination for a given key
+        '''
         self.mutex.acquite()
         if not (key in self.records):
             self.records[key] = {}
@@ -42,6 +46,10 @@ class dataStore(object):
         self.mutex.release()
         
     def getRecordData(self, key):
+        '''
+        Get all the field and value combinations in a dictionary for the 
+        specified key
+        '''
         self.mutex.acquite()
         if key in self.records:
             result = self.records[key]
@@ -51,6 +59,9 @@ class dataStore(object):
         return result
         
     def deleteRecord(self, key):
+        '''
+        Delete the record specified by key
+        '''
         self.mutex.acquire()
         if key in self.records:
             del self.records[key]
@@ -58,6 +69,9 @@ class dataStore(object):
             
             
 if __name__ == "__main__":
+    '''
+    Test cases for the dataStore object and example use.
+    '''
     
     print "Testing dataStore class"
     print "=================================================="

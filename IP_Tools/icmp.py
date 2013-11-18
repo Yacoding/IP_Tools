@@ -133,6 +133,11 @@ class IcmpGen(object):
         
         
     def icmpRecvr(self, threadID, s, dataStr):
+        '''
+        This should be run in a seperate thread to catch all incoming ICMP packets
+        The controlling thread should set object.keepRunning[threadID] to False
+        to terminate the thread
+        '''
         self.keepRunning[threadID] = True
         timeout = 3
         
@@ -149,12 +154,15 @@ class IcmpGen(object):
         
 class packet(object):
     '''
-    classdocs
+    A class to contruct and interpret a buffer as an ICMP packet
     '''
 
     def __init__(self, packet = None):
         '''
-        Constructor
+        Constructor.
+        If called with a parameter it will attempt to interpret that
+        parameter as a buffer containing an ICMP packet.
+        Sets up the function pointers to the different handlers.
         '''
         self.packetInterpreter = \
             {\
@@ -305,7 +313,7 @@ class packet(object):
         
     def createPacket(self, params = {}):
         '''
-        create a packet
+        Create a packet and convert it to the internal raw format.
         '''
         self.raw = None
         if 'type' in params:
@@ -344,9 +352,11 @@ class packet(object):
 import sys
 from Tools.PacketDataCollector import dataStore 
 #import pydevd
-#pydevd.patch_django_autoreload(patch_remote_debugger=True, patch_show_console=True)
 if __name__ == "__main__":
- 
+    '''
+    Test cases and examples of how to use the classes in this file
+    '''
+    
     if os.geteuid() != 0:
         print "This must be run as root"
         exit()
