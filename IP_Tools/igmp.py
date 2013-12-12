@@ -13,7 +13,7 @@ from IP_Tools import RawPacketIO
 
 BUFSIZE = 2000
     
-class IcmpGen(RawPacketIO.socketGen):
+class IgmpGen(RawPacketIO.socketGen):
     
     def __init__(self):
         super.__init__(protocol='igmp')
@@ -227,20 +227,20 @@ if __name__ == "__main__":
 #    import Tools.ConfFileParser
 
     ds = dataStore("ICMP test results")
-    icmp = IcmpGen()
-    sckt = icmp.openSocket(sys.argv[1])
+    igmp = IgmpGen()
+    sckt = igmp.openSocket(sys.argv[1])
        
     #start icmp recv task
-    thread1 = threading.Thread( target = icmp.icmpRecvr, args = ('thread1', sckt, ds) )
+    thread1 = threading.Thread( target = igmp.icmpRecvr, args = ('thread1', sckt, ds) )
     thread1.start()
     
     # start sending the pings
-    icmp.sendPing(ds, sckt, sys.argv[1], 0, 0, 20)
+    igmp.sendPing(ds, sckt, sys.argv[1], 0, 0, 20)
     
     sleep(60)
     
     # stop the receiving thread
-    icmp.keepRunning['thread1'] = False
+    igmp.keepRunning['thread1'] = False
     #Wait for receiving thread to end
     thread1.join()
 #    pydevd.settrace()
