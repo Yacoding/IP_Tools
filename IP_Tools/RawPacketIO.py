@@ -5,6 +5,47 @@ Created on 13 Nov 2013
 '''
 import socket
 import time
+import threading
+import os
+
+class socketGen(object):
+    '''
+    Base class for socket generators
+    '''    
+    BUFSIZE = 2000
+    def __init__(self, protocol='', bufSize = socketGen.BUFSIZE, port=22):
+        self.keepRunning = {}
+        
+        self.socketMutex = threading.Lock()
+        self.protocol = protocol
+        self.bufSize = bufSize
+        self.port = port
+    
+    def openSocket(self, dest, protocol):
+        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.getprotobyname(self.protocol))
+        s.connect((socket.gethostbyname(dest), self.port)) # port shouldn't really matter we're sending icmp proto
+        ## setuid back to normal user
+        os.setuid(os.getuid())
+        return s
+    
+    def closeSocket(self, s):
+        self.socketMutex.acquire()
+        s.close()
+        self.socketMutex.release()
+        return
+    
+    def send(self, s, pkt):
+        self.socketMutex.acquire()
+        s.send(pkt)
+        self.socketMutex.release()
+        return 
+    
+    def recv(self, s):
+        self.socketMutex.acquire()
+        s.recv(self.bufSize)
+        self.socketMutex.release()
+        return       
+
 
 def carry_around_add(a, b):
     c = a + b
@@ -28,6 +69,9 @@ class raw_IP_IO(object):
 class rawPacket(object):
     '''
     classdocs
+    
+    TODO: this may have problems take a look here for writing raw packets
+    http://mbrownnyc.wordpress.com/2010/02/09/networking-python-script-to-repeatedly-query-the-all-hosts-igmp-group-for-igmp-snooping/
     '''
 
     def __init__(self, params):

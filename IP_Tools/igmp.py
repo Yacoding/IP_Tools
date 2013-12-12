@@ -1,10 +1,8 @@
-#!/usr/bin/env python
 '''
-Created on 14 Nov 2013
+Created on 12 Dec 2013
 
 @author: kelsey
 '''
-#from IP_Tools.RawPacketIO import rawPacket
 import socket
 import select
 import struct
@@ -14,61 +12,12 @@ import time.sleep as sleep
 import os
 from IP_Tools import RawPacketIO
 
-ICMP_MINLEN = 8
-ICMP_MASKLEN = 12
-
-ICMP_ECHOREPLY = 0
-ICMP_UNREACH = 3
-ICMP_SOURCEQUENCH = 4
-ICMP_REDIRECT = 5
-ICMP_ECHO = 8
-ICMP_TIMXCEED = 11
-ICMP_PARAMPROB = 12
-ICMP_TSTAMP = 13
-ICMP_TSTAMPREPLY = 14
-ICMP_IREQ = 15
-ICMP_IREQREPLY = 16
-ICMP_MASKREQ = 17
-ICMP_MASKREPLY = 18
-
-ICMP_TYPE = \
-{\
-    ICMP_ECHOREPLY : 'Echo Reply',
-    ICMP_UNREACH : 'Unreachable',
-    ICMP_SOURCEQUENCH : 'Source Quench',
-    ICMP_REDIRECT : 'Redirect',
-    ICMP_ECHO : 'Echo',
-    ICMP_TIMXCEED : 'Time Exceeded',
-    ICMP_PARAMPROB : 'Param Problem', 
-    ICMP_TSTAMP : 'Timestamp',
-    ICMP_TSTAMPREPLY : 'Timestamp reply',
-    ICMP_IREQ : 'IReq',
-    ICMP_IREQREPLY : 'IReq reply',
-    ICMP_MASKREQ : 'Mask Req.',
-    ICMP_MASKREPLY : 'Mask Reply',
-}
-
-ICMP_UNREACH_NET = 0
-ICMP_UNREACH_HOST = 1
-ICMP_UNREACH_PROTOCOL = 2
-ICMP_UNREACH_PORT = 3
-ICMP_UNREACH_NEEDFRAG = 4
-ICMP_UNREACH_SRCFAIL = 5
-
-ICMP_REDIRECT_NET = 0
-ICMP_REDIRECT_HOST = 1
-ICMP_REDIRECT_TOSNET = 2
-ICMP_REDIRECT_TOSHOST = 3
-    
-ICMP_TIMXCEED_INTRANS = 0
-ICMP_TIMXCEED_REASS = 1
-
 BUFSIZE = 2000
     
 class IcmpGen(RawPacketIO.socketGen):
     
     def __init__(self):
-        super.__init__(protocol='icmp')
+        super.__init__(protocol='igmp')
         self.keepRunning = {}
         
         self.socketMutex = threading.Lock()
@@ -87,17 +36,19 @@ class IcmpGen(RawPacketIO.socketGen):
         self.closeSocket(s)
         return packet(buf[20:]), (endTime - startTime)
     
-    def simplePing(self, dst):
+    def sendGroupQuery(self, dst):
         
         pkt = packet()
-        pkt.createPacket({'type':ICMP_ECHO, 'payload':'abc', 'id':1, 'seq':1})
+# TODO: finish
+        pkt.createPacket({'type':IGMP_GRPMEMQRY, 'payload':'abc', 'id':1, 'seq':1})
         recv_packet, timetaken = self.sendAndRecvResponse(pkt, dst)
         
         print "< ICMP test Time taken %d.%06d packet receieved %s >" % ( timetaken.seconds, timetaken.microseconds, recv_packet)
         
-    def sendPing(self, dataStr, s, dst, _id, seq_start, seq_end, interPacketInterval = 0.001):
+    def simpleGroupQuery(self, dataStr, s, dst, _id, seq_start, seq_end, interPacketInterval = 0.001):
         pkt = packet()
-        pkt.createPacket({'type':ICMP_ECHO, 'payload':'abc', 'id':_id, 'seq':seq_start})
+# TODO: finish
+        pkt.createPacket({'type':IGMP_GRPMEMQRY, 'payload':'abc', 'id':_id, 'seq':seq_start})
         
         for i in range(seq_start, seq_end + 1):
             pkt.createPacket({'seq':i})
@@ -108,7 +59,7 @@ class IcmpGen(RawPacketIO.socketGen):
         self.closeSocket(s)
         
         
-    def icmpRecvr(self, threadID, s, dataStr):
+    def igmpRecvr(self, threadID, s, dataStr):
         '''
         This should be run in a seperate thread to catch all incoming ICMP packets
         The controlling thread should set object.keepRunning[threadID] to False
@@ -128,6 +79,19 @@ class IcmpGen(RawPacketIO.socketGen):
                 except ValueError:
                     continue
         
+IGMP_GRPMEMQRY = 0x11 # "Group Membership Query",
+IGMP_V1_MEMREP = 0x12 # "Version 1 - Membership Report",
+IGMP_V2_MEMREP = 0x16 # "Version 2 - Membership Report",
+IGMP_LEAVEGRP  = 0x17 # "Leave Group"}
+
+IGMP_TYPE = \
+{\
+    IGMP_GRPMEMQRY : 'Group Membership Query',
+    IGMP_V1_MEMREP : 'Version 1 - Membership Report',
+    IGMP_V2_MEMREP : 'Version 2 - Membership Report',
+    IGMP_LEAVEGRP  : 'Leave Group',
+}
+        
 class packet(object):
     '''
     A class to contruct and interpret a buffer as an ICMP packet
@@ -142,39 +106,21 @@ class packet(object):
         '''
         self.packetInterpreter = \
             {\
-             ICMP_ECHOREPLY:    self._intprt_echoreply,
-             ICMP_UNREACH:      self._intprt_unreach,
-             ICMP_SOURCEQUENCH: self._intprt_sourcequench,
-             ICMP_REDIRECT:     self._intprt_redirect,
-             ICMP_ECHO:         self._intprt_echo,
-             ICMP_TIMXCEED:     self._intprt_timxceed,
-             ICMP_PARAMPROB:    self._intprt_paramprob,
-             ICMP_TSTAMP:       self._intprt_tstamp,
-             ICMP_TSTAMPREPLY:  self._intprt_tstampreply,
-             ICMP_IREQ:         self._intprt_ireq,
-             ICMP_IREQREPLY:    self._intprt_ireqreply,
-             ICMP_MASKREQ:      self._intprt_maskreq,
-             ICMP_MASKREPLY:    self._intprt_maskreply,
+             IGMP_GRPMEMQRY: self._intprt_group_member_query,
+             IGMP_V1_MEMREP: self._intprt_v1_member_report,
+             IGMP_V2_MEMREP: self._intprt_v2_member_report,
+             IGMP_LEAVEGRP:  self._intprt_leave_group,
              }
             
         self.packetCreator = \
             {\
-             ICMP_ECHOREPLY:    self._create_echoreply,
-             ICMP_UNREACH:      self._create_unreach,
-             ICMP_SOURCEQUENCH: self._create_sourcequench,
-             ICMP_REDIRECT:     self._create_redirect,
-             ICMP_ECHO:         self._create_echo,
-             ICMP_TIMXCEED:     self._create_timxceed,
-             ICMP_PARAMPROB:    self._create_paramprob,
-             ICMP_TSTAMP:       self._create_tstamp,
-             ICMP_TSTAMPREPLY:  self._create_tstampreply,
-             ICMP_IREQ:         self._create_ireq,
-             ICMP_IREQREPLY:    self._create_ireqreply,
-             ICMP_MASKREQ:      self._create_maskreq,
-             ICMP_MASKREPLY:    self._create_maskreply,
+             IGMP_GRPMEMQRY: self._create_group_member_query,
+             IGMP_V1_MEMREP: self._create_v1_member_report,
+             IGMP_V2_MEMREP: self._create_v2_member_report,
+             IGMP_LEAVEGRP:  self._create_leave_group,
              }
             
-        self.type = ICMP_ECHO
+        self.type = IGMP_GRPMEMQRY
         self.code = 0
         self.payloadparams = '' # used to construct a raw payload
         self.payloadraw = '' # raw format that can be sent
@@ -187,87 +133,34 @@ class packet(object):
             self.fromPacket(packet)
             
         
-    def _intprt_echoreply(self):
+    def _intprt_group_member_query(self):
         pack_format = "%ss" % len(self.payloadraw)
         self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
         
-    def _intprt_unreach(self):
+    def _intprt_v1_member_report(self):
         pack_format = "%ss" % len(self.payloadraw)
         self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
     
-    def _intprt_sourcequench(self):
+    def _intprt_v2_member_report(self):
         pack_format = "%ss" % len(self.payloadraw)
         self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
     
-    def _intprt_redirect(self):
+    def _intprt_leave_group(self):
         pack_format = "%ss" % len(self.payloadraw)
         self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
     
-    def _intprt_echo(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_timxceed(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_paramprob(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_tstamp(self):
-        self.payloadrepr = "Payload: original timestamp %d" \
-            % (struct.unpack('i', self.payloadraw[:4]))
-    
-    def _intprt_tstampreply(self):
-        self.payloadrepr = "Payload: original timestamp %d, receive timestamp %d, transmit timestamp %d" \
-            % (struct.unpack('i' * 3, self.payloadraw[:12]))
-    
-    def _intprt_ireq(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_ireqreply(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_maskreq(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_maskreply(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-               
         
-    def _create_echoreply(self): pass
+    def _create_group_member_query(self): pass
         
-    def _create_unreach(self): pass
+    def _create_v1_member_report(self): pass
     
-    def _create_sourcequench(self): pass
+    def _create_v2_member_report(self): pass
     
-    def _create_redirect(self): pass
-    
-    def _create_echo(self): pass
-    
-    def _create_timxceed(self): pass
-    
-    def _create_paramprob(self): pass
-    
-    def _create_tstamp(self): pass
-    
-    def _create_tstampreply(self): pass
-    
-    def _create_ireq(self): pass
-    
-    def _create_ireqreply(self): pass
-    
-    def _create_maskreq(self): pass
-    
-    def _create_maskreply(self): pass
+    def _create_leave_group(self): pass
+  
                
     def __repr__(self):
-        return "<ICMP packet %s %d %d %d %s>" % (ICMP_TYPE[self.type], self.code, self.id, self.seq, self.payloadrepr)
+        return "<ICMP packet %s %d %d %d %s>" % (IGMP_TYPE[self.type], self.code, self.id, self.seq, self.payloadrepr)
     
     def fromPacket(self, packet):
         '''
@@ -323,7 +216,6 @@ class packet(object):
             self.raw = buf[0:2] + csum + buf[4:]
             
         return self.raw
-    
     
 import sys
 from Tools.PacketDataCollector import dataStore 
