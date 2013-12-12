@@ -5,7 +5,6 @@ Created on 14 Nov 2013
 @author: kelsey
 '''
 #from IP_Tools.RawPacketIO import rawPacket
-import socket
 import select
 import struct
 import threading
@@ -140,6 +139,9 @@ class packet(object):
         parameter as a buffer containing an ICMP packet.
         Sets up the function pointers to the different handlers.
         '''
+        self.type_name = 'icmp'
+        self.type_lookup = ICMP_TYPE
+        
         self.packetInterpreter = \
             {\
              ICMP_ECHOREPLY:    self._intprt_echoreply,
@@ -175,13 +177,8 @@ class packet(object):
              }
             
         self.type = ICMP_ECHO
-        self.code = 0
-        self.payloadparams = '' # used to construct a raw payload
-        self.payloadraw = '' # raw format that can be sent
-        self.payloadrepr = '' # format that can be printed
-        self.id = 0
-        self.seq = 0
-        self.raw = ''
+        
+        super.__init__()
         
         if packet != None:
             self.fromPacket(packet)
@@ -265,9 +262,6 @@ class packet(object):
     def _create_maskreq(self): pass
     
     def _create_maskreply(self): pass
-               
-    def __repr__(self):
-        return "<ICMP packet %s %d %d %d %s>" % (ICMP_TYPE[self.type], self.code, self.id, self.seq, self.payloadrepr)
     
     def fromPacket(self, packet):
         '''

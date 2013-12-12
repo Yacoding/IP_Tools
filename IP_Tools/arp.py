@@ -1,8 +1,10 @@
+#!/usr/bin/env python
 '''
-Created on 12 Dec 2013
+Created on 14 Nov 2013
 
 @author: kelsey
 '''
+#from IP_Tools.RawPacketIO import rawPacket
 import select
 import struct
 import threading
@@ -11,12 +13,20 @@ import time.sleep as sleep
 import os
 from IP_Tools import RawPacketIO
 
+
+ARP_DUMMY= 0
+
+ARP_TYPE = \
+{\
+    ARP_DUMMY: 'ARP dummy', # TODO: remove when I find the actual types
+}
+
 BUFSIZE = 2000
     
-class IcmpGen(RawPacketIO.socketGen):
+class ArpGen(RawPacketIO.socketGen):
     
     def __init__(self):
-        super.__init__(protocol='igmp')
+        super.__init__(protocol='arp')
         self.keepRunning = {}
         
         self.socketMutex = threading.Lock()
@@ -35,19 +45,17 @@ class IcmpGen(RawPacketIO.socketGen):
         self.closeSocket(s)
         return packet(buf[20:]), (endTime - startTime)
     
-    def sendGroupQuery(self, dst):
+    def simpleArpReq(self, dst):
         
         pkt = packet()
-# TODO: finish
-        pkt.createPacket({'type':IGMP_GRPMEMQRY, 'payload':'abc', 'id':1, 'seq':1})
+        pkt.createPacket({'type':ARP_DUMMY, 'payload':'abc', 'id':1, 'seq':1})
         recv_packet, timetaken = self.sendAndRecvResponse(pkt, dst)
         
         print "< ICMP test Time taken %d.%06d packet receieved %s >" % ( timetaken.seconds, timetaken.microseconds, recv_packet)
         
-    def simpleGroupQuery(self, dataStr, s, dst, _id, seq_start, seq_end, interPacketInterval = 0.001):
+    def sendArpReq(self, dataStr, s, dst, _id, seq_start, seq_end, interPacketInterval = 0.001):
         pkt = packet()
-# TODO: finish
-        pkt.createPacket({'type':IGMP_GRPMEMQRY, 'payload':'abc', 'id':_id, 'seq':seq_start})
+        pkt.createPacket({'type':ARP_DUMMY, 'payload':'abc', 'id':_id, 'seq':seq_start})
         
         for i in range(seq_start, seq_end + 1):
             pkt.createPacket({'seq':i})
@@ -58,7 +66,7 @@ class IcmpGen(RawPacketIO.socketGen):
         self.closeSocket(s)
         
         
-    def igmpRecvr(self, threadID, s, dataStr):
+    def ArpRecvr(self, threadID, s, dataStr):
         '''
         This should be run in a seperate thread to catch all incoming ICMP packets
         The controlling thread should set object.keepRunning[threadID] to False
@@ -78,19 +86,6 @@ class IcmpGen(RawPacketIO.socketGen):
                 except ValueError:
                     continue
         
-IGMP_GRPMEMQRY = 0x11 # "Group Membership Query",
-IGMP_V1_MEMREP = 0x12 # "Version 1 - Membership Report",
-IGMP_V2_MEMREP = 0x16 # "Version 2 - Membership Report",
-IGMP_LEAVEGRP  = 0x17 # "Leave Group"}
-
-IGMP_TYPE = \
-{\
-    IGMP_GRPMEMQRY : 'Group Membership Query',
-    IGMP_V1_MEMREP : 'Version 1 - Membership Report',
-    IGMP_V2_MEMREP : 'Version 2 - Membership Report',
-    IGMP_LEAVEGRP  : 'Leave Group',
-}
-        
 class packet(object):
     '''
     A class to contruct and interpret a buffer as an ICMP packet
@@ -103,26 +98,20 @@ class packet(object):
         parameter as a buffer containing an ICMP packet.
         Sets up the function pointers to the different handlers.
         '''
-        self.type_name = 'igmp'
-        self.type_lookup = IGMP_TYPE
+        self.type_name = 'arp'
+        self.type_lookup = ARP_TYPE
         
         self.packetInterpreter = \
             {\
-             IGMP_GRPMEMQRY: self._intprt_group_member_query,
-             IGMP_V1_MEMREP: self._intprt_v1_member_report,
-             IGMP_V2_MEMREP: self._intprt_v2_member_report,
-             IGMP_LEAVEGRP:  self._intprt_leave_group,
+             ARP_DUMMY:    self._intprt_arp_dummy,
              }
             
         self.packetCreator = \
             {\
-             IGMP_GRPMEMQRY: self._create_group_member_query,
-             IGMP_V1_MEMREP: self._create_v1_member_report,
-             IGMP_V2_MEMREP: self._create_v2_member_report,
-             IGMP_LEAVEGRP:  self._create_leave_group,
+             ARP_DUMMY:    self._create_arp_dummy,
              }
             
-        self.type = IGMP_GRPMEMQRY
+        self.type = ARP_DUMMY
         
         super.__init__()
         
@@ -130,31 +119,12 @@ class packet(object):
             self.fromPacket(packet)
             
         
-    def _intprt_group_member_query(self):
+    def _intprt_arp_dummy(self):
         pack_format = "%ss" % len(self.payloadraw)
         self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
         
-    def _intprt_v1_member_report(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_v2_member_report(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-    def _intprt_leave_group(self):
-        pack_format = "%ss" % len(self.payloadraw)
-        self.payloadrepr = "Payload: raw - %s" % (struct.unpack(pack_format, self.payloadraw))
-    
-        
-    def _create_group_member_query(self): pass
-        
-    def _create_v1_member_report(self): pass
-    
-    def _create_v2_member_report(self): pass
-    
-    def _create_leave_group(self): pass
-      
+    def _create_arp_dummy(self): pass
+               
     def fromPacket(self, packet):
         '''
         Convert a buffer to a packet
@@ -209,6 +179,7 @@ class packet(object):
             self.raw = buf[0:2] + csum + buf[4:]
             
         return self.raw
+    
     
 import sys
 from Tools.PacketDataCollector import dataStore 

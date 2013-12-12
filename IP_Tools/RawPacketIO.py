@@ -8,6 +8,27 @@ import time
 import threading
 import os
 
+class basePacket(object):
+    
+    def __init__(self):
+        self.type_name = 'undefined'
+        self.type_lookup = []
+        self.code = 0
+        self.payloadparams = '' # used to construct a raw payload
+        self.payloadraw = '' # raw format that can be sent
+        self.payloadrepr = '' # format that can be printed
+        self.id = 0
+        self.seq = 0
+        self.raw = ''
+        
+    def __repr__(self):
+        if self.type in self.type_lookup:
+            text = "<%s packet %s %d %d %d %s>" % \
+                    (self.type_name, self.type_lookup[self.type], self.code, self.id, self.seq, self.payloadrepr)
+        else:
+            text = "<ERROR: unknown packet type>"
+        return text
+        
 class socketGen(object):
     '''
     Base class for socket generators
