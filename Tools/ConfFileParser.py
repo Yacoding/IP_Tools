@@ -56,4 +56,14 @@ class ConfFileParser(object):
         if conf_num < len(self.conf): 
             return self.conf[conf_num]
         else:
-            return None    
+            return None
+        
+if __name__ == '__main__':
+    
+    if len(sys.argv) < 2:
+        print "Need to pass the config filename"
+        exit(-1)
+        
+    configs = ConfFileParser(sys.argv[1])
+    
+    print configs
