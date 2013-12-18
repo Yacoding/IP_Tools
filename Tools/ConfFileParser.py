@@ -19,6 +19,7 @@ class ConfFileParser(object):
         self.filename = filename
         self.conf = []
         self.configFile = ConfigParser.RawConfigParser()
+        self.readConfigFile()
         
     def readConfigFile(self):
         try:
@@ -46,6 +47,9 @@ class ConfFileParser(object):
                 dict1[option] = None
         return dict1
     
+    def getConfigNames(self):
+        return self.configFile.sections()
+    
     def getConfigs(self):
         return self.conf
     
@@ -59,6 +63,12 @@ class ConfFileParser(object):
         else:
             return None
         
+    def getConfigByName(self, name):
+        for x in self.conf:
+            if x['config'] == name:
+                return x
+        return None
+        
 if __name__ == '__main__':
     
     if len(sys.argv) < 2:
@@ -66,6 +76,6 @@ if __name__ == '__main__':
         exit(-1)
         
     configs = ConfFileParser(sys.argv[1])
-    configs.readConfigFile()
+    
     for cfg in configs.getNextConf():
         print cfg
