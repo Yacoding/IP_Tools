@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 Created on 14 Nov 2013
 
@@ -65,5 +66,6 @@ if __name__ == '__main__':
         exit(-1)
         
     configs = ConfFileParser(sys.argv[1])
-    
-    print configs
+    configs.readConfigFile()
+    for cfg in configs.getNextConf():
+        print cfg
