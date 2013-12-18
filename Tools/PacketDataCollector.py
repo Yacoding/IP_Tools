@@ -16,9 +16,7 @@ class dataStore(object):
         Set up the new dicationary and create the mutex.
         '''
         self.name = name
-        
         self.records = {}
-        
         self.mutex = Lock()
         
     def __str__(self):
@@ -26,46 +24,54 @@ class dataStore(object):
     
     def __repr__(self):
         self.mutex.acquite()
-        string = "<dataStore %s>\n" % self.name
-        for key in sorted(self.records.iterkeys()):
-            string += ("\t<id %d - " % key)
-            for val in self.records[key]:
-                string += str(val) + ":" + str(self.records[key][val]) + " "
-            string += ">\n"
-        self.mutex.release()
+        try:
+            string = "<dataStore %s>\n" % self.name
+            for key in sorted(self.records.iterkeys()):
+                string += ("\t<id %d - " % key)
+                for val in self.records[key]:
+                    string += str(val) + ":" + str(self.records[key][val]) + " "
+                string += ">\n"
+        finally:
+            self.mutex.release()
         return string
     
     def addRecordData(self, key, field, value):
         '''
         Add/Update a field and value combination for a given key
         '''
-        self.mutex.acquite()
-        if not (key in self.records):
-            self.records[key] = {}
-        self.records[key][field] = value
-        self.mutex.release()
+        self.mutex.acquire()
+        try:
+            if not (key in self.records):
+                self.records[key] = {}
+            self.records[key][field] = value
+        finally:
+            self.mutex.release()
         
     def getRecordData(self, key):
         '''
         Get all the field and value combinations in a dictionary for the 
         specified key
         '''
-        self.mutex.acquite()
-        if key in self.records:
-            result = self.records[key]
-        else:
-            result = None
-        self.mutex.release()
-        return result
+        self.mutex.acquire()
+        try:
+            if key in self.records:
+                result = self.records[key]
+            else:
+                result = None
+        finally:
+            self.mutex.release()
+            return result
         
     def deleteRecord(self, key):
         '''
         Delete the record specified by key
         '''
         self.mutex.acquire()
-        if key in self.records:
-            del self.records[key]
-        self.mutex.release()
+        try:
+            if key in self.records:
+                del self.records[key]
+        finally:
+            self.mutex.release()
             
             
 if __name__ == "__main__":
